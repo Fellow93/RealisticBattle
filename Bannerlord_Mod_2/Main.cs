@@ -11,6 +11,8 @@ using SandBox;
 using System.Reflection;
 using JetBrains.Annotations;
 using static TaleWorlds.MountAndBlade.Agent;
+using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using Helpers;
 
 namespace RealisticBattle
 {
@@ -997,7 +999,7 @@ namespace RealisticBattle
     }
     
     //volunteers
-    /*    [HarmonyPatch(typeof(RecruitCampaignBehavior))]
+        [HarmonyPatch(typeof(RecruitCampaignBehavior))]
         [HarmonyPatch("UpdateVolunteersOfNotables")]
         class BetterVolunteers
         {
@@ -1094,7 +1096,7 @@ namespace RealisticBattle
                 }
                 return false;
             }
-        } */
+        }
     //volunteers
 
     class Main : MBSubModuleBase
