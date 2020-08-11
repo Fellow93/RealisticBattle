@@ -14,7 +14,10 @@ using static TaleWorlds.MountAndBlade.Agent;
 using System.Collections;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using Helpers;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 namespace RealisticBattle
 {
     public static class Vars
