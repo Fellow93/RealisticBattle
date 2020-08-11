@@ -10,7 +10,6 @@ using static TaleWorlds.MountAndBlade.ArrangementOrder;
 using SandBox;
 using System.Reflection;
 using JetBrains.Annotations;
-using static TaleWorlds.MountAndBlade.Agent;
 using System.Collections;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using Helpers;
