@@ -11,6 +11,10 @@ using SandBox;
 using System.Reflection;
 using JetBrains.Annotations;
 using static TaleWorlds.MountAndBlade.Agent;
+<<<<<<< Updated upstream
+=======
+using System.Collections;
+>>>>>>> Stashed changes
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using Helpers;
 
@@ -1096,7 +1100,11 @@ namespace RealisticBattle
                 }
                 return false;
             }
+<<<<<<< Updated upstream
         }
+=======
+        } 
+>>>>>>> Stashed changes
     //volunteers
 
     class Main : MBSubModuleBase
