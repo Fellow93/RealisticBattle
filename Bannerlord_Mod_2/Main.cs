@@ -11,6 +11,8 @@ using SandBox;
 using System.Reflection;
 using JetBrains.Annotations;
 using System.Collections;
+using static TaleWorlds.Core.ItemObject;
+using static RealisticBattle.Tactics;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using Helpers;
 
@@ -57,9 +59,27 @@ namespace RealisticBattle
 
         public static int calculateThrowableSpeed(float ammoWeight)
         {
-            int calculatedThrowingSpeed = (int)Math.Ceiling(Math.Sqrt(320f * 2f / ammoWeight));
-
+            int calculatedThrowingSpeed = (int)Math.Ceiling(Math.Sqrt(160f * 2f / ammoWeight));
+            calculatedThrowingSpeed += 7;
             return calculatedThrowingSpeed;
+        }
+
+        public static bool HasBattleBeenJoined(Formation mainInfantry, bool hasBattleBeenJoined, float battleJoinRange)
+        {
+            if (mainInfantry?.QuerySystem.ClosestSignificantlyLargeEnemyFormation != null && !(mainInfantry.AI.ActiveBehavior is BehaviorCharge) && !(mainInfantry.AI.ActiveBehavior is BehaviorTacticalCharge))
+            {
+                return mainInfantry.QuerySystem.MedianPosition.AsVec2.Distance(mainInfantry.QuerySystem.ClosestSignificantlyLargeEnemyFormation.MedianPosition.AsVec2) / mainInfantry.QuerySystem.ClosestSignificantlyLargeEnemyFormation.MovementSpeedMaximum <= battleJoinRange + (hasBattleBeenJoined ? 5f : 0f);
+            }
+            return true;
+        }
+
+        public static void FixCharge(ref Formation formation)
+        {
+            if (formation != null)
+            {
+                formation.AI.ResetBehaviorWeights();
+                formation.AI.SetBehaviorWeight<BehaviorCharge>(1f);
+            }
         }
     }
 
@@ -133,7 +153,7 @@ namespace RealisticBattle
                             team.AddTacticOption(new TacticFullScaleAttack(team));
                             team.AddTacticOption(new TacticRangedHarrassmentOffensive(team));
                             team.AddTacticOption(new TacticFrontalCavalryCharge(team));
-                            team.AddTacticOption(new TacticCoordinatedRetreat(team));
+                            //team.AddTacticOption(new TacticCoordinatedRetreat(team));
                             team.AddTacticOption(new TacticCharge(team));
                         }
                         if (team.Side == BattleSideEnum.Defender)
@@ -143,10 +163,10 @@ namespace RealisticBattle
                             team.AddTacticOption(new TacticDefensiveLine(team));
                             team.AddTacticOption(new TacticHoldChokePoint(team));
                             team.AddTacticOption(new TacticHoldTheHill(team));
-                            team.AddTacticOption(new TacticRangedHarrassmentOffensive(team));
-                            team.AddTacticOption(new TacticCoordinatedRetreat(team));
-                            team.AddTacticOption(new TacticFullScaleAttack(team));
-                            team.AddTacticOption(new TacticFrontalCavalryCharge(team));
+                            //team.AddTacticOption(new TacticRangedHarrassmentOffensive(team));
+                            //team.AddTacticOption(new TacticCoordinatedRetreat(team));
+                            //team.AddTacticOption(new TacticFullScaleAttack(team));
+                            //team.AddTacticOption(new TacticFrontalCavalryCharge(team));
                             team.AddTacticOption(new TacticCharge(team));
 
                             //team.AddTacticOption(new TacticDefensiveRing(team));
@@ -211,19 +231,19 @@ namespace RealisticBattle
                     }
                 case BoneBodyPartType.Head:
                     {
-                        __result = __instance.GetAgentDrivenPropertyValue(DrivenProperty.ArmorHead) * 1.2f;
+                        __result = __instance.GetAgentDrivenPropertyValue(DrivenProperty.ArmorHead);
                         break;
                     }
                 case BoneBodyPartType.Neck:
                     {
                         // __result = getNeckArmor(__instance);
-                        __result = __instance.GetAgentDrivenPropertyValue(DrivenProperty.ArmorHead);
+                        __result = __instance.GetAgentDrivenPropertyValue(DrivenProperty.ArmorHead) * 0.8f;
                         break;
                     }
                 case BoneBodyPartType.BipedalLegs:
                 case BoneBodyPartType.QuadrupedalLegs:
                     {
-                        __result = __instance.GetAgentDrivenPropertyValue(DrivenProperty.ArmorLegs);
+                        __result = getLegArmor(__instance);
                         break;
                     }
                 case BoneBodyPartType.BipedalArmLeft:
@@ -231,7 +251,7 @@ namespace RealisticBattle
                 case BoneBodyPartType.QuadrupedalArmLeft:
                 case BoneBodyPartType.QuadrupedalArmRight:
                     {
-                        __result = getArmArmor(__instance) * 1.5f;
+                        __result = getArmArmor(__instance);
                         break;
                     }
                 case BoneBodyPartType.Chest:
@@ -292,7 +312,6 @@ namespace RealisticBattle
                 if (equipmentElement.Item != null && equipmentElement.Item.ItemType == ItemObject.ItemTypeEnum.BodyArmor)
                 {
                     num += (float)equipmentElement.Item.ArmorComponent.ArmArmor;
-                    num += (float)equipmentElement.Item.ArmorComponent.BodyArmor * 0.5f;
                 }
             }
             return num;
@@ -338,6 +357,20 @@ namespace RealisticBattle
                 }
             }
             return 0f;
+        }
+
+        static public float getLegArmor(Agent agent)
+        {
+            float num = 0f;
+            for (EquipmentIndex equipmentIndex = EquipmentIndex.NumAllWeaponSlots; equipmentIndex < EquipmentIndex.ArmorItemEndSlot; equipmentIndex++)
+            {
+                EquipmentElement equipmentElement = agent.SpawnEquipment[equipmentIndex];
+                if (equipmentElement.Item != null && equipmentElement.Item.ItemType == ItemObject.ItemTypeEnum.LegArmor)
+                {
+                    num += (float)equipmentElement.Item.ArmorComponent.LegArmor;
+                }
+            }
+            return num;
         }
     }
 
@@ -420,11 +453,14 @@ namespace RealisticBattle
     [HarmonyPatch("ComputeBlowMagnitudeMissile")]
     class RealArrowDamage
     {
+        
         static bool Prefix(ref AttackCollisionData acd, ItemObject weaponItem, bool isVictimAgentNull, float momentumRemaining, float missileTotalDamage, out float baseMagnitude, out float specialMagnitude, Vec3 victimVel)
         {
 
             //Vec3 gcn = acd.CollisionGlobalNormal;
-            //Vec3 wbd = acd.WeaponBlowDir;
+           // Vec3 wbd = acd.MissileVelocity;
+
+            //float angleModifier = Vec3.DotProduct(gcn, wbd);
 
             //Vec3 resultVec = gcn + wbd;
             //float angleModifier = 1f - Math.Abs((resultVec.x + resultVec.y + resultVec.z) / 3);
@@ -523,16 +559,6 @@ namespace RealisticBattle
         }
     }
 
-    //[HarmonyPatch(typeof(TacticComponent))]
-    //[HarmonyPatch("AssignTacticFormations1121")]
-    //class OverrideAssignTacticFormations1121
-    //{
-    //    static void Postfix(TacticComponent __instance)
-    //    {
-    //        __instance.ToString();
-    //    }
-    //}
-
     [HarmonyPatch(typeof(Agent))]
     [HarmonyPatch("GetHasRangedWeapon")]
     class OverrideGetHasRangedWeapon
@@ -628,6 +654,7 @@ namespace RealisticBattle
                 }
                 else if (!missionWeapon.Equals(MissionWeapon.Invalid))
                 {
+                    _oldMissileSpeeds.Add(missionWeapon.GetMissileSpeedForUsage(0));
                     PropertyInfo property = typeof(WeaponComponentData).GetProperty("MissileSpeed");
                     property.DeclaringType.GetProperty("MissileSpeed");
                     property.SetValue(missionWeapon.CurrentUsageItem, calculatedMissileSpeed, BindingFlags.NonPublic | BindingFlags.SetProperty, null, null, null);
@@ -673,7 +700,7 @@ namespace RealisticBattle
         {
             MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
 
-            WeaponData wd = missionWeapon.GetWeaponData(needBatchedVersionForMeshes: true);
+            //WeaponData wd = missionWeapon.GetWeaponData(needBatchedVersionForMeshes: true);
             WeaponStatsData[] wsd = missionWeapon.GetWeaponStatsData();
 
             if ((wsd[0].WeaponClass == (int)WeaponClass.Bow) || (wsd[0].WeaponClass == (int)WeaponClass.Crossbow))
@@ -684,21 +711,37 @@ namespace RealisticBattle
 
                 int calculatedMissileSpeed = Utilities.calculateMissileSpeed(ammoWeight, missionWeapon, missionWeapon.GetMissileSpeedForUsage(0));
 
-                float modifier = calculatedMissileSpeed / velocity.Length;
-                velocity.x = (shooterAgent.Velocity.x + velocity.x) * modifier;
-                velocity.y = (shooterAgent.Velocity.y + velocity.y) * modifier;
-                velocity.z = (shooterAgent.Velocity.z + velocity.z) * modifier;
+               // float physicModifier = calculatedMissileSpeed + shooterAgent.Velocity.Length;
+
+                Vec3 shooterAgentVelocity = new Vec3(shooterAgent.Velocity, -1);
+                Vec3 myVelocity = new Vec3(velocity, -1);
+
+                myVelocity.Normalize();
+
+                float shooterAgentSpeed = Vec3.DotProduct(shooterAgentVelocity, myVelocity);
+
+                Vec3 modifierVec = shooterAgentVelocity + myVelocity;
+                //float modifierAngle = 1 - (modifierVec.x + modifierVec.y + modifierVec.z) / 3;
+
+                velocity.x = myVelocity.x * (calculatedMissileSpeed + shooterAgentSpeed);
+                velocity.y = myVelocity.y * (calculatedMissileSpeed + shooterAgentSpeed);
+                velocity.z = myVelocity.z * (calculatedMissileSpeed + shooterAgentSpeed);
+                //float direction = velocity.Normalize();
+
+                //velocity.x = (shooterAgent.Velocity.x + velocity.x) * physicModifier;
+                //velocity.y = (shooterAgent.Velocity.y + velocity.y) * physicModifier;
+                //velocity.z = (shooterAgent.Velocity.z + velocity.z) * physicModifier;
 
                 PropertyInfo property2 = typeof(WeaponComponentData).GetProperty("MissileSpeed");
                 property2.DeclaringType.GetProperty("MissileSpeed");
                 property2.SetValue(shooterAgent.Equipment[weaponIndex].CurrentUsageItem, calculatedMissileSpeed, BindingFlags.NonPublic | BindingFlags.SetProperty, null, null, null);
 
-                missionWeapon = shooterAgent.Equipment[weaponIndex];
+                //missionWeapon = shooterAgent.Equipment[weaponIndex];
 
-                wd = missionWeapon.GetWeaponData(needBatchedVersionForMeshes: true);
-                wsd = missionWeapon.GetWeaponStatsData();
+               // wd = missionWeapon.GetWeaponData(needBatchedVersionForMeshes: true);
+               // wsd = missionWeapon.GetWeaponStatsData();
 
-                WeaponData awd = WeaponData.InvalidWeaponData;
+               // WeaponData awd = WeaponData.InvalidWeaponData;
 
                 //MethodInfo method = typeof(Agent).GetMethod("WeaponEquipped", BindingFlags.NonPublic | BindingFlags.Instance);
                 //method.DeclaringType.GetMethod("WeaponEquipped");
@@ -1019,7 +1062,80 @@ namespace RealisticBattle
 
         }
     }
-    
+
+    [HarmonyPatch(typeof(TacticFullScaleAttack))]
+    class OverrideTacticFullScaleAttack
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("Attack")]
+        static void PostfixAttack(ref Formation ____mainInfantry)
+        {
+            Utilities.FixCharge(ref ____mainInfantry);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch("HasBattleBeenJoined")]
+        static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
+        {
+            __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+        }
+    }
+
+    [HarmonyPatch(typeof(TacticFrontalCavalryCharge))]
+    class OverrideTacticFrontalCavalryCharge
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("Attack")]
+        static void PostfixAttack(ref Formation ____mainInfantry)
+        {
+            Utilities.FixCharge(ref ____mainInfantry);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch("HasBattleBeenJoined")]
+        static void PostfixHasBattleBeenJoined(Formation ____cavalry, bool ____hasBattleBeenJoined, ref bool __result)
+        {
+            __result = Utilities.HasBattleBeenJoined(____cavalry, ____hasBattleBeenJoined, 7f);
+        }
+    }
+    [HarmonyPatch(typeof(TacticRangedHarrassmentOffensive))]
+    class OverrideTacticRangedHarrassmentOffensive
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("Attack")]
+        static void PostfixAttack(ref Formation ____mainInfantry)
+        {
+            Utilities.FixCharge(ref ____mainInfantry);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch("HasBattleBeenJoined")]
+        static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
+        {
+            __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+        }
+    }
+    [HarmonyPatch(typeof(TacticDefensiveLine))]
+    class OverrideTacticDefensiveLine
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("HasBattleBeenJoined")]
+        static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
+        {
+            __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+        }
+    }
+    [HarmonyPatch(typeof(TacticDefensiveEngagement))]
+    class OverrideTacticDefensiveEngagement
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("HasBattleBeenJoined")]
+        static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
+        {
+            __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+        }
+    }
+
     //volunteers
         [HarmonyPatch(typeof(RecruitCampaignBehavior))]
         [HarmonyPatch("UpdateVolunteersOfNotables")]
@@ -1118,8 +1234,10 @@ namespace RealisticBattle
                 }
                 return false;
             }
-        } 
+        }
     //volunteers
+
+
 
     class Main : MBSubModuleBase
     {
