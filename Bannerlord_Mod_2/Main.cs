@@ -763,10 +763,10 @@ namespace RealisticBattle
                 armorAmount = 0;
             }
             float num2 = (float)armorAmount;
-            if (hitShieldOnBack && shieldOnBack != null)
+            /*if (hitShieldOnBack && shieldOnBack != null)
             {
                 num2 += 10f;
-            }
+            }*/
 
             string weaponType = "otherDamage";
             if (item != null && item.PrimaryWeapon != null)
@@ -792,6 +792,12 @@ namespace RealisticBattle
                 num4 *= combatDifficultyMultiplier;
             }
 
+            if (hitShieldOnBack && shieldOnBack != null)
+            {
+                num2 += 0f;
+                num4 = 0f;
+            }
+
             num3 *= num4;
             
             inflictedDamage = MBMath.ClampInt((int)num3, 0, 2000);
@@ -808,10 +814,11 @@ namespace RealisticBattle
         [HarmonyPatch("ComputeBlowDamageOnShield")]
         class OverrideDamageCalcShield
         {
-            static bool Prefix(bool isAttackerAgentNull, bool isAttackerAgentActive, bool canGiveDamageToAgentShield, bool isVictimAgentLeftStance, MissionWeapon victimShield, ref AttackCollisionData attackCollisionData, WeaponComponentData attackerWeapon, float blowMagnitude)
+            static bool Prefix(bool isAttackerAgentNull, bool isAttackerAgentActive, bool canGiveDamageToAgentShield, bool isVictimAgentLeftStance, MissionWeapon victimShield, ref AttackCollisionData attackCollisionData, WeaponComponentData attackerWeapon, float blowMagnitude/*, WeaponComponentData shieldOnBack, bool hitShieldOnBack*/)
             {
                 attackCollisionData.InflictedDamage = 0;
-                if (victimShield.CurrentUsageItem.WeaponFlags.HasAnyFlag(WeaponFlags.CanBlockRanged) & canGiveDamageToAgentShield)
+                if ((victimShield.CurrentUsageItem.WeaponFlags.HasAnyFlag(WeaponFlags.CanBlockRanged) & canGiveDamageToAgentShield) ||
+                (victimShield.CurrentUsageItem.WeaponFlags.HasAnyFlag(WeaponFlags.CanBlockRanged)) && (attackerWeapon != null && attackerWeapon.WeaponFlags.HasAnyFlag(WeaponFlags.CanPenetrateShield)))
                 {
                     DamageTypes damageType = (DamageTypes)attackCollisionData.DamageType;
                     int shieldArmorForCurrentUsage = victimShield.GetShieldArmorForCurrentUsage();
@@ -873,6 +880,10 @@ namespace RealisticBattle
                     {
                         num *= 2.5f;
                     }
+                    /*if (attackerWeapon != null && attackerWeapon.WeaponFlags.HasAnyFlag(WeaponFlags.CanPenetrateShield))
+                    {
+                        num *= 2.5f;
+                    }*/
                     if (num > 0f)
                     {
                         if (!isVictimAgentLeftStance)
@@ -883,6 +894,10 @@ namespace RealisticBattle
                         {
                             num *= ManagedParameters.Instance.GetManagedParameter(ManagedParametersEnum.ShieldCorrectSideBlockDamageMultiplier);
                         }
+                        /*if  (hitShieldOnBack && shieldOnBack != null)
+                        {
+                            num *= ManagedParameters.Instance.GetManagedParameter(ManagedParametersEnum.ShieldCorrectSideBlockDamageMultiplier);
+                        }*/
 
                         num = MissionGameModels.Current.AgentApplyDamageModel.CalculateShieldDamage(num);
                         //InformationManager.DisplayMessage(new InformationMessage("num: " + num));
