@@ -708,7 +708,7 @@ namespace RealisticBattle
     {
         [HarmonyPostfix]
         [HarmonyPatch("CalculateCurrentOrder")]
-        static void PostfixCalculateCurrentOrdert(ref Formation ___formation, ref MovementOrder ____currentOrder)
+        static void PostfixCalculateCurrentOrdert(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder)
         {
             if (___formation != null && ___formation.QuerySystem.IsInfantryFormation &&  ___formation.QuerySystem.ClosestEnemyFormation != null)
             {
@@ -748,6 +748,11 @@ namespace RealisticBattle
                     MethodInfo method = typeof(MovementOrder).GetMethod("MovementOrderChargeToTarget", BindingFlags.NonPublic | BindingFlags.Static);
                     method.DeclaringType.GetMethod("MovementOrderChargeToTarget");
                     ____currentOrder = (MovementOrder)method.Invoke(____currentOrder, new object[] { significantEnemy });
+
+                    Vec2 direction = significantEnemy.Direction;
+                    MethodInfo method2 = typeof(FacingOrder).GetMethod("FacingOrderLookAtDirection", BindingFlags.NonPublic | BindingFlags.Static);
+                    method2.DeclaringType.GetMethod("FacingOrderLookAtDirection");
+                    ___CurrentFacingOrder = (FacingOrder)method2.Invoke(___CurrentFacingOrder, new object[] { -direction });
                 }
             }else if (___formation.QuerySystem.IsCavalryFormation || ___formation.QuerySystem.IsRangedCavalryFormation || ___formation.QuerySystem.IsRangedFormation) 
             {
@@ -847,7 +852,7 @@ namespace RealisticBattle
 
         [HarmonyPostfix]
         [HarmonyPatch("OnBehaviorActivatedAux")]
-        static void PrefixGetFormationFrame(Formation ___formation)
+        static void PrefixGetFormationFrame(ref Formation ___formation)
         {
             if (___formation != null && ___formation.QuerySystem.IsInfantryFormation && ___formation.QuerySystem.ClosestEnemyFormation != null)
             {
@@ -1015,6 +1020,62 @@ namespace RealisticBattle
                 }
             }
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(BehaviorRegroup))]
+    class OverrideBehaviorRegroup
+    {
+
+        private static WorldPosition regroupPosition = WorldPosition.Invalid;
+
+        [HarmonyPrefix]
+        [HarmonyPatch("GetAiWeight")]
+        static bool PostfixGetAiWeight(ref Formation ___formation, ref float __result)
+        {
+            if (___formation != null)
+            {
+                FormationQuerySystem querySystem = ___formation.QuerySystem;
+                if (___formation.AI.ActiveBehavior == null)
+                {
+                    __result = 0f;
+                    return false;
+                }
+                PropertyInfo property = typeof(BehaviorComponent).GetProperty("BehaviorCoherence", BindingFlags.NonPublic | BindingFlags.Instance);
+                property.DeclaringType.GetProperty("BehaviorCoherence");
+                float behaviorCoherence = (float)property.GetValue(___formation.AI.ActiveBehavior, BindingFlags.NonPublic | BindingFlags.GetProperty, null, null, null) * 4f;
+
+                //__result =  MBMath.Lerp(0.1f, 1.2f, MBMath.ClampFloat(behaviorCoherence * (querySystem.FormationIntegrityData.DeviationOfPositionsExcludeFarAgents + 1f) / (querySystem.IdealAverageDisplacement + 1f), 0f, 3f) / 3f);
+                __result = MBMath.Lerp(0.1f, 1.2f, MBMath.ClampFloat(behaviorCoherence * (querySystem.FormationIntegrityData.DeviationOfPositionsExcludeFarAgents + 1f) / (querySystem.IdealAverageDisplacement + 1f), 0f, 3f) / 3f);
+                return false;
+
+            }
+            return true;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch("GetAiWeight")]
+        static bool PostfixGetAiWeight(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder, ref float __result)
+        {
+            if (___formation != null)
+            {
+                if (regroupPosition.IsValid)
+                {
+                    ____currentOrder = MovementOrder.MovementOrderMove(regroupPosition);
+                }
+                else
+                {
+                    WorldPosition medianPosition = ___formation.QuerySystem.MedianPosition;
+                    medianPosition.SetVec2(___formation.QuerySystem.AveragePosition + ___formation.Direction * 3f);
+                    ____currentOrder = MovementOrder.MovementOrderMove(medianPosition);
+                    regroupPosition = medianPosition;
+                }
+                Vec2 direction = (___formation.QuerySystem.ClosestEnemyFormation == null) ? ___formation.Direction : (___formation.QuerySystem.ClosestEnemyFormation.MedianPosition.AsVec2 - ___formation.QuerySystem.AveragePosition).Normalized();
+                MethodInfo method = typeof(FacingOrder).GetMethod("FacingOrderLookAtDirection", BindingFlags.NonPublic | BindingFlags.Static);
+                method.DeclaringType.GetMethod("FacingOrderLookAtDirection");
+                ___CurrentFacingOrder = (FacingOrder)method.Invoke(___CurrentFacingOrder, new object[] { direction });
+            }
+            return false;
         }
     }
 }
