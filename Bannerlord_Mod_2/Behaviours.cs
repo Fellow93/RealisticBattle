@@ -748,8 +748,6 @@ namespace RealisticBattle
                     MethodInfo method = typeof(MovementOrder).GetMethod("MovementOrderChargeToTarget", BindingFlags.NonPublic | BindingFlags.Static);
                     method.DeclaringType.GetMethod("MovementOrderChargeToTarget");
                     ____currentOrder = (MovementOrder)method.Invoke(____currentOrder, new object[] { significantEnemy });
-                    // ___formation.OrderPosition = significantEnemy.QuerySystem.MedianPosition;
-                    ___formation.FormOrder = FormOrder.FormOrderDeep;
                 }
             }else if (___formation.QuerySystem.IsCavalryFormation || ___formation.QuerySystem.IsRangedCavalryFormation || ___formation.QuerySystem.IsRangedFormation) 
             {
@@ -840,6 +838,61 @@ namespace RealisticBattle
             }
 
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(BehaviorAdvance))]
+    class OverrideBehaviorAdvance
+    {
+
+        [HarmonyPostfix]
+        [HarmonyPatch("OnBehaviorActivatedAux")]
+        static void PrefixGetFormationFrame(Formation ___formation)
+        {
+            if (___formation != null && ___formation.QuerySystem.IsInfantryFormation && ___formation.QuerySystem.ClosestEnemyFormation != null)
+            {
+                Formation significantEnemy = null;
+                float dist = 10000f;
+
+                foreach (Team team in Mission.Current.Teams.ToList())
+                {
+                    if (team.IsEnemyOf(___formation.Team))
+                    {
+                        Formation newSignificantEnemy = null;
+                        foreach (Formation enemyFormation in team.Formations.ToList())
+                        {
+                            if (enemyFormation.QuerySystem.IsInfantryFormation)
+                            {
+                                newSignificantEnemy = enemyFormation;
+                            }
+                            if (newSignificantEnemy == null && enemyFormation.QuerySystem.IsRangedFormation)
+                            {
+                                newSignificantEnemy = enemyFormation;
+                            }
+                        }
+                        if (newSignificantEnemy != null)
+                        {
+                            float newDist = ___formation.QuerySystem.MedianPosition.AsVec2.Distance(newSignificantEnemy.QuerySystem.MedianPosition.AsVec2);
+                            if (newDist < dist)
+                            {
+                                significantEnemy = newSignificantEnemy;
+                                dist = newDist;
+                            }
+                        }
+                    }
+                }
+                if (significantEnemy != null)
+                {
+                    if (___formation.Width > significantEnemy.Width)
+                    {
+                        significantEnemy.FormOrder = FormOrder.FormOrderCustom(___formation.Width);
+                    }
+                    else
+                    {
+                        ___formation.FormOrder = FormOrder.FormOrderCustom(significantEnemy.Width);
+                    }
+                }
+            }
         }
     }
 
