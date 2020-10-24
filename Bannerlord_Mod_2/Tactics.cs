@@ -232,7 +232,7 @@ namespace RealisticBattle
                 {
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmish>(1f);
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmishLine>(0f);
-                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(1f);
+                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(0f);
                 }
                 if (____rightCavalry != null)
                 {
@@ -396,7 +396,7 @@ namespace RealisticBattle
                 {
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmish>(1f);
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmishLine>(0f);
-                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(1f);
+                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(0f);
                 }
                 Utilities.FixCharge(ref ____mainInfantry);
             }
@@ -454,7 +454,7 @@ namespace RealisticBattle
                 {
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmish>(1f);
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmishLine>(0f);
-                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(1f);
+                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(0f);
                 }
                 Utilities.FixCharge(ref ____mainInfantry);
             }
@@ -586,7 +586,7 @@ namespace RealisticBattle
                 {
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmish>(1f);
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmishLine>(0f);
-                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(1f);
+                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(0f);
                 }
                 if (____rightCavalry != null)
                 {
@@ -646,7 +646,7 @@ namespace RealisticBattle
                 {
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmish>(1f);
                     ____archers.AI.SetBehaviorWeight<BehaviorSkirmishLine>(0f);
-                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(1f);
+                    ____archers.AI.SetBehaviorWeight<BehaviorScreenedSkirmish>(0f);
                 }
                 if (____rightCavalry != null)
                 {
@@ -668,8 +668,6 @@ namespace RealisticBattle
                 }
                 Utilities.FixCharge(ref ____mainInfantry);
             }
-
-        
         }
 
         [HarmonyPatch(typeof(TacticComponent))]

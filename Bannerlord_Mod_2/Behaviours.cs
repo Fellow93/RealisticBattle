@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Engine;
@@ -237,8 +238,8 @@ namespace RealisticBattle
                     ___CurrentFacingOrder = (FacingOrder)method.Invoke(___CurrentFacingOrder, new object[] { ____mainFormation.Direction });
 
                     WorldPosition medianPosition = ____mainFormation.QuerySystem.MedianPosition;
-                    //medianPosition.SetVec2(medianPosition.AsVec2 - ____mainFormation.Direction * ((____mainFormation.Depth + ___formation.Depth) * 1.5f));
-                    medianPosition.SetVec2(medianPosition.AsVec2 - ____mainFormation.Direction * ((____mainFormation.Depth + ___formation.Depth) * 0.25f + 0.0f));
+                    medianPosition.SetVec2(medianPosition.AsVec2 - ____mainFormation.Direction * ((____mainFormation.Depth + ___formation.Depth) * 0.8f));
+                    //medianPosition.SetVec2(medianPosition.AsVec2 - ____mainFormation.Direction * ((____mainFormation.Depth + ___formation.Depth) * 0.25f + 0.0f));
                     ____currentOrder = MovementOrder.MovementOrderMove(medianPosition);
 
                 }
@@ -746,9 +747,221 @@ namespace RealisticBattle
                 {
                     MethodInfo method = typeof(MovementOrder).GetMethod("MovementOrderChargeToTarget", BindingFlags.NonPublic | BindingFlags.Static);
                     method.DeclaringType.GetMethod("MovementOrderChargeToTarget");
-                    method.Invoke(____currentOrder, new object[] { significantEnemy });
+                    ____currentOrder = (MovementOrder)method.Invoke(____currentOrder, new object[] { significantEnemy });
+                    // ___formation.OrderPosition = significantEnemy.QuerySystem.MedianPosition;
+                    ___formation.FormOrder = FormOrder.FormOrderDeep;
+                }
+            }else if (___formation.QuerySystem.IsCavalryFormation || ___formation.QuerySystem.IsRangedCavalryFormation || ___formation.QuerySystem.IsRangedFormation) 
+            {
+                ____currentOrder = MovementOrder.MovementOrderCharge;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(FormationMovementComponent))]
+    class OverrideFormationMovementComponent
+    {
+        private static readonly MethodInfo IsUnitDetached =
+            typeof(Formation).GetMethod("IsUnitDetached", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static readonly MethodInfo GetMovementSpeedRestriction =
+            typeof(ArrangementOrder).GetMethod("GetMovementSpeedRestriction",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static readonly PropertyInfo arrangement =
+            typeof(Formation).GetProperty("arragement", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        [HarmonyPrefix]
+        [HarmonyPatch("GetFormationFrame")]
+        static bool PrefixGetFormationFrame(ref bool __result, Agent ___Agent, ref FormationCohesionComponent ____cohesionComponent,ref WorldPosition formationPosition,ref Vec2 formationDirection,ref float speedLimit,ref bool isSettingDestinationSpeed,ref bool limitIsMultiplier)
+        {
+            var formation = ___Agent.Formation;
+            if (!___Agent.IsMount && formation != null && !(bool)IsUnitDetached.Invoke(formation, new object[] { ___Agent }))
+            {
+                if (formation.MovementOrder.OrderType == OrderType.ChargeWithTarget)
+                {
+                    isSettingDestinationSpeed = false;
+                    formationPosition = formation.GetOrderPositionOfUnit(___Agent);
+                    formationDirection = formation.GetDirectionOfUnit(___Agent);
+                    limitIsMultiplier = true;
+                    speedLimit = ____cohesionComponent != null && FormationCohesionComponent.FormationSpeedAdjustmentEnabled ? ____cohesionComponent.GetDesiredSpeedInFormation() : -1f;
+                    __result = true;
+                    return false;
                 }
             }
+
+            return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(MovementOrder))]
+    class OverrideMovementOrder
+    {
+
+        [HarmonyPrefix]
+        [HarmonyPatch("SetChargeBehaviorValues")]
+        static bool PrefixGetFormationFrame(Agent unit)
+        {
+            if (unit.Formation != null && unit.Formation.MovementOrder.OrderType == OrderType.ChargeWithTarget)
+            {
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 3f, 8f, 5f, 20f, 6f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 4f, 5f, 0f, 20f, 0f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.Ranged, 0f, 7f, 0f, 20f, 0f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.ChargeHorseback, 0f, 7f, 0f, 30f, 0f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.RangedHorseback, 0f, 15f, 0f, 30f, 0f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityMelee, 5f, 12f, 7.5f, 30f, 4f);
+                //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityRanged, 0.55f, 12f, 0.8f, 30f, 0.45f);
+                //unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 40f, 4f, 50f, 6f);
+                //unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 5.5f, 7f, 1f, 10f, 0f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 0f, 0f, 0f, 0f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 0f, 0f, 0f, 0f, 0f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.Ranged, 0f, 7f, 1f, 11, 20f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.ChargeHorseback, 5f, 40f, 4f, 60f, 0f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.RangedHorseback, 5f, 7f, 10f, 8, 20f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityMelee, 5f, 12f, 7.5f, 30f, 4f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityRanged, 0.55f, 12f, 0.8f, 30f, 0.45f);
+
+                return false;
+            }
+
+            return true;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch("GetSubstituteOrder")]
+        static bool PrefixGetSubstituteOrder(MovementOrder __instance, ref MovementOrder __result, Formation formation)
+        {
+            if (__instance.OrderType == OrderType.ChargeWithTarget)
+            {
+                var position = formation.QuerySystem.MedianPosition;
+                position.SetVec2(formation.CurrentPosition);
+                __result = MovementOrder.MovementOrderMove(position);
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(Formation))]
+    class OverrideFormation
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch("GetOrderPositionOfUnit")]
+        static bool PrefixGetOrderPositionOfUnit(Formation __instance, ref WorldPosition ____orderPosition, ref IFormationArrangement ____arrangement,  Agent unit, List<Agent> ___detachedUnits, ref WorldPosition __result)
+        {
+            if (!___detachedUnits.Contains(unit) && __instance.MovementOrder.OrderType == OrderType.ChargeWithTarget)
+            {
+                //if (__instance != null && __instance.QuerySystem.IsInfantryFormation && __instance.QuerySystem.ClosestEnemyFormation != null)
+                //{
+                //    Formation significantEnemy = null;
+                //    float dist = 10000f;
+
+                //    foreach (Team team in Mission.Current.Teams.ToList())
+                //    {
+                //        if (team.IsEnemyOf(__instance.Team))
+                //        {
+                //            Formation newSignificantEnemy = null;
+                //            foreach (Formation enemyFormation in team.Formations.ToList())
+                //            {
+                //                if (enemyFormation.QuerySystem.IsInfantryFormation)
+                //                {
+                //                    newSignificantEnemy = enemyFormation;
+                //                }
+                //                if (newSignificantEnemy == null && enemyFormation.QuerySystem.IsRangedFormation)
+                //                {
+                //                    newSignificantEnemy = enemyFormation;
+                //                }
+                //            }
+                //            if (newSignificantEnemy != null)
+                //            {
+                //                float newDist = __instance.QuerySystem.MedianPosition.AsVec2.Distance(newSignificantEnemy.QuerySystem.MedianPosition.AsVec2);
+                //                if (newDist < dist)
+                //                {
+                //                    significantEnemy = newSignificantEnemy;
+                //                    dist = newDist;
+                //                }
+                //            }
+                //        }
+                //    }
+                Formation significantEnemy = __instance.TargetFormation;
+                if (significantEnemy != null)
+                {
+                    WorldPosition CurrentTargetPosition = WorldPosition.Invalid;
+                    try
+                    {
+                        var formation = unit.Formation;
+                        if (formation == null)
+                            CurrentTargetPosition =  WorldPosition.Invalid;
+                        var targetFormation = significantEnemy;
+
+                        var targetAgent = unit.GetTargetAgent();
+                        if (targetAgent == null || targetAgent.Formation != significantEnemy)
+                        {
+                        Vec2 unitPosition = formation.GetCurrentGlobalPositionOfUnit(unit, true) * 0.2f + unit.Position.AsVec2 * 0.8f;
+                        //Vec2 unitPosition = targetAgent.Position.AsVec2;
+                            targetAgent = Utilities.NearestAgent(unitPosition, significantEnemy);
+                        }
+                        if (targetAgent != null)
+                        {
+                            WorldPosition targetAgentPosition = new WorldPosition(Mission.Current.Scene, targetAgent.GetWorldPosition().GetGroundVec3());
+
+                            int rank = ((IFormationUnit)unit).FormationRankIndex;
+                            if (rank > 0)
+                            {
+                                LineFormation lineFormation = ((LineFormation)____arrangement);
+                                Vec2? localPosition = lineFormation.GetLocalPositionOfUnitOrDefault(((IFormationUnit)unit));
+                                Agent unitInFront = (lineFormation.GetNeighbourUnit(((IFormationUnit)unit), 0, -1) as Agent);
+                                if(unitInFront != null)
+                                {
+                                    Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
+                                    Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
+                                    float distance = vec.Normalize();
+                                    WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
+                                    unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * 2f);
+                                    unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.6f);
+                                    //WorldPosition unitInFrontPosition = new WorldPosition(Mission.Current.Scene, unitInFront.GetWorldPosition().GetGroundVec3());
+                                    //unitInFrontPosition.SetVec2(unitInFrontPosition.AsVec2 - formation.Direction *1.5f);
+                                    CurrentTargetPosition = unitPosition;
+                                }
+                                else
+                                {
+                                    targetAgentPosition.SetVec2(targetAgentPosition.AsVec2);
+                                    CurrentTargetPosition = targetAgentPosition;
+                                }
+                            }
+                            else
+                            {
+                                targetAgentPosition.SetVec2(targetAgentPosition.AsVec2);
+                                CurrentTargetPosition = targetAgentPosition;
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                    }
+
+                    // CurrentTargetPosition = WorldPosition.Invalid;
+
+                    //WorldPosition medianPosition = significantEnemy.QuerySystem.MedianPosition;
+                    //medianPosition.SetVec2(medianPosition.AsVec2 + significantEnemy.Direction * (significantEnemy.Depth / 2 + __instance.Depth / 2));
+                    if (CurrentTargetPosition.IsValid)
+                    {
+                        __result = CurrentTargetPosition;
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                    
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            return true;
         }
     }
 }
