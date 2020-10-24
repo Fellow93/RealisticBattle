@@ -814,10 +814,8 @@ namespace RealisticBattle
                 //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.RangedHorseback, 0f, 15f, 0f, 30f, 0f);
                 //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityMelee, 5f, 12f, 7.5f, 30f, 4f);
                 //    unit.SetAIBehaviorValues(AISimpleBehaviorKind.AttackEntityRanged, 0.55f, 12f, 0.8f, 30f, 0.45f);
-                //unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 40f, 4f, 50f, 6f);
-                //unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 5.5f, 7f, 1f, 10f, 0f);
-                unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 0f, 0f, 0f, 0f);
-                unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 0f, 0f, 0f, 0f, 0f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 0.1f, 0f, 0f, 0.01f);
+                unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 0f, 0.1f, 0f, 0f, 0.01f);
                 unit.SetAIBehaviorValues(AISimpleBehaviorKind.Ranged, 0f, 7f, 1f, 11, 20f);
                 unit.SetAIBehaviorValues(AISimpleBehaviorKind.ChargeHorseback, 5f, 40f, 4f, 60f, 0f);
                 unit.SetAIBehaviorValues(AISimpleBehaviorKind.RangedHorseback, 5f, 7f, 10f, 8, 20f);
@@ -965,28 +963,28 @@ namespace RealisticBattle
                             WorldPosition targetAgentPosition = new WorldPosition(Mission.Current.Scene, targetAgent.GetWorldPosition().GetGroundVec3());
 
                             int rank = ((IFormationUnit)unit).FormationRankIndex;
-                            if (rank > 0)
+                            if (rank >= 0)
                             {
                                 LineFormation lineFormation = ((LineFormation)____arrangement);
                                 Vec2? localPosition = lineFormation.GetLocalPositionOfUnitOrDefault(((IFormationUnit)unit));
-                                Agent unitInFront = (lineFormation.GetNeighbourUnit(((IFormationUnit)unit), 0, -1) as Agent);
-                                if(unitInFront != null)
-                                {
-                                    Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
-                                    Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
-                                    float distance = vec.Normalize();
-                                    WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
-                                    unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * 2f);
-                                    unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.6f);
-                                    //WorldPosition unitInFrontPosition = new WorldPosition(Mission.Current.Scene, unitInFront.GetWorldPosition().GetGroundVec3());
-                                    //unitInFrontPosition.SetVec2(unitInFrontPosition.AsVec2 - formation.Direction *1.5f);
-                                    CurrentTargetPosition = unitPosition;
-                                }
-                                else
-                                {
-                                    targetAgentPosition.SetVec2(targetAgentPosition.AsVec2);
-                                    CurrentTargetPosition = targetAgentPosition;
-                                }
+                                //Agent unitInFront = (lineFormation.GetNeighbourUnit(((IFormationUnit)unit), 0, -1) as Agent);
+                                //if (unitInFront != null)
+                                //{
+                                Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
+                                Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
+                                float distance = vec.Normalize();
+                                WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
+                                unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * 2f);
+                                unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.575f);
+                                //WorldPosition unitInFrontPosition = new WorldPosition(Mission.Current.Scene, unitInFront.GetWorldPosition().GetGroundVec3());
+                                //unitInFrontPosition.SetVec2(unitInFrontPosition.AsVec2 - formation.Direction *1.5f);
+                                CurrentTargetPosition = unitPosition;
+                                //}
+                                //else
+                                //{
+                                //    targetAgentPosition.SetVec2(targetAgentPosition.AsVec2);
+                                //    CurrentTargetPosition = targetAgentPosition;
+                                //}
                             }
                             else
                             {
