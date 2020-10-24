@@ -708,7 +708,7 @@ namespace RealisticBattle
     {
         [HarmonyPostfix]
         [HarmonyPatch("CalculateCurrentOrder")]
-        static void PostfixCalculateCurrentOrdert(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder)
+        static void PostfixCalculateCurrentOrder(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder)
         {
             if (___formation != null && ___formation.QuerySystem.IsInfantryFormation &&  ___formation.QuerySystem.ClosestEnemyFormation != null)
             {
@@ -757,6 +757,25 @@ namespace RealisticBattle
             }else if (___formation.QuerySystem.IsCavalryFormation || ___formation.QuerySystem.IsRangedCavalryFormation || ___formation.QuerySystem.IsRangedFormation) 
             {
                 ____currentOrder = MovementOrder.MovementOrderCharge;
+            }
+        }
+
+
+        [HarmonyPrefix]
+        [HarmonyPatch("OnBehaviorActivatedAux")]
+        static bool PrefixOnBehaviorActivatedAux(ref Formation ___formation)
+        {
+            if (___formation != null && ___formation.MovementOrder.OrderType == OrderType.Move)
+            {
+                ___formation.ArrangementOrder = ArrangementOrder.ArrangementOrderLoose;
+                ___formation.FacingOrder = FacingOrder.FacingOrderLookAtEnemy;
+                ___formation.FiringOrder = FiringOrder.FiringOrderFireAtWill;
+                ___formation.WeaponUsageOrder = WeaponUsageOrder.WeaponUsageOrderUseAny;
+                return false;
+            }
+            else
+            {
+                return true;
             }
         }
     }
@@ -965,6 +984,16 @@ namespace RealisticBattle
                             int rank = ((IFormationUnit)unit).FormationRankIndex;
                             if (rank >= 0)
                             {
+                                if (targetAgent.GetMorale() < 0.01f || targetAgent.IsRetreating() || targetAgent.IsRunningAway)
+                                {
+                                    unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 0f, 0f, 0f, 0f);
+                                    unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 0f, 0f, 0f, 0f, 0f);
+                                }
+                                else
+                                {
+                                    unit.SetAIBehaviorValues(AISimpleBehaviorKind.GoToPos, 0f, 0.1f, 0f, 0f, 0.01f);
+                                    unit.SetAIBehaviorValues(AISimpleBehaviorKind.Melee, 0f, 0.1f, 0f, 0f, 0.01f);
+                                }
                                 LineFormation lineFormation = ((LineFormation)____arrangement);
                                 Vec2? localPosition = lineFormation.GetLocalPositionOfUnitOrDefault(((IFormationUnit)unit));
                                 //Agent unitInFront = (lineFormation.GetNeighbourUnit(((IFormationUnit)unit), 0, -1) as Agent);
