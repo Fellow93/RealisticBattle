@@ -749,10 +749,14 @@ namespace RealisticBattle
                     method.DeclaringType.GetMethod("MovementOrderChargeToTarget");
                     ____currentOrder = (MovementOrder)method.Invoke(____currentOrder, new object[] { significantEnemy });
 
+
+                    //Vec2 direction = (significantEnemy.QuerySystem.MedianPosition.AsVec2 - ___formation.QuerySystem.MedianPosition.AsVec2).Normalized();
                     Vec2 direction = significantEnemy.Direction;
                     MethodInfo method2 = typeof(FacingOrder).GetMethod("FacingOrderLookAtDirection", BindingFlags.NonPublic | BindingFlags.Static);
                     method2.DeclaringType.GetMethod("FacingOrderLookAtDirection");
                     ___CurrentFacingOrder = (FacingOrder)method2.Invoke(___CurrentFacingOrder, new object[] { -direction });
+                    ___formation.FacingOrder = ___CurrentFacingOrder;
+
                 }
             }else if (___formation.QuerySystem.IsCavalryFormation || ___formation.QuerySystem.IsRangedCavalryFormation || ___formation.QuerySystem.IsRangedFormation) 
             {
@@ -765,10 +769,10 @@ namespace RealisticBattle
         [HarmonyPatch("OnBehaviorActivatedAux")]
         static bool PrefixOnBehaviorActivatedAux(ref Formation ___formation)
         {
-            if (___formation != null && ___formation.MovementOrder.OrderType == OrderType.Move)
+            if (___formation != null && (___formation.MovementOrder.OrderType == OrderType.Move || ___formation.MovementOrder.OrderType == OrderType.ChargeWithTarget))
             {
                 ___formation.ArrangementOrder = ArrangementOrder.ArrangementOrderLoose;
-                ___formation.FacingOrder = FacingOrder.FacingOrderLookAtEnemy;
+                //___formation.FacingOrder = FacingOrder.FacingOrderLookAtEnemy;
                 ___formation.FiringOrder = FiringOrder.FiringOrderFireAtWill;
                 ___formation.WeaponUsageOrder = WeaponUsageOrder.WeaponUsageOrderUseAny;
                 return false;
@@ -777,6 +781,7 @@ namespace RealisticBattle
             {
                 return true;
             }
+            return true;
         }
     }
 
@@ -927,38 +932,6 @@ namespace RealisticBattle
         {
             if (!___detachedUnits.Contains(unit) && __instance.MovementOrder.OrderType == OrderType.ChargeWithTarget)
             {
-                //if (__instance != null && __instance.QuerySystem.IsInfantryFormation && __instance.QuerySystem.ClosestEnemyFormation != null)
-                //{
-                //    Formation significantEnemy = null;
-                //    float dist = 10000f;
-
-                //    foreach (Team team in Mission.Current.Teams.ToList())
-                //    {
-                //        if (team.IsEnemyOf(__instance.Team))
-                //        {
-                //            Formation newSignificantEnemy = null;
-                //            foreach (Formation enemyFormation in team.Formations.ToList())
-                //            {
-                //                if (enemyFormation.QuerySystem.IsInfantryFormation)
-                //                {
-                //                    newSignificantEnemy = enemyFormation;
-                //                }
-                //                if (newSignificantEnemy == null && enemyFormation.QuerySystem.IsRangedFormation)
-                //                {
-                //                    newSignificantEnemy = enemyFormation;
-                //                }
-                //            }
-                //            if (newSignificantEnemy != null)
-                //            {
-                //                float newDist = __instance.QuerySystem.MedianPosition.AsVec2.Distance(newSignificantEnemy.QuerySystem.MedianPosition.AsVec2);
-                //                if (newDist < dist)
-                //                {
-                //                    significantEnemy = newSignificantEnemy;
-                //                    dist = newDist;
-                //                }
-                //            }
-                //        }
-                //    }
                 Formation significantEnemy = __instance.TargetFormation;
                 if (significantEnemy != null)
                 {
@@ -971,12 +944,12 @@ namespace RealisticBattle
                         var targetFormation = significantEnemy;
 
                         var targetAgent = unit.GetTargetAgent();
-                        if (targetAgent == null || targetAgent.Formation != significantEnemy)
-                        {
-                        Vec2 unitPosition = formation.GetCurrentGlobalPositionOfUnit(unit, true) * 0.2f + unit.Position.AsVec2 * 0.8f;
-                        //Vec2 unitPosition = targetAgent.Position.AsVec2;
-                            targetAgent = Utilities.NearestAgent(unitPosition, significantEnemy);
-                        }
+                        //if (targetAgent == null || targetAgent.Formation != significantEnemy)
+                        //{
+                        //    Vec2 unitPosition = formation.GetCurrentGlobalPositionOfUnit(unit, true) * 0.2f + unit.Position.AsVec2 * 0.8f;
+                        //    //Vec2 unitPosition = targetAgent.Position.AsVec2;
+                        //    targetAgent = Utilities.NearestAgent(unitPosition, significantEnemy);
+                        //}
                         if (targetAgent != null)
                         {
                             WorldPosition targetAgentPosition = new WorldPosition(Mission.Current.Scene, targetAgent.GetWorldPosition().GetGroundVec3());
@@ -1003,7 +976,7 @@ namespace RealisticBattle
                                 Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
                                 float distance = vec.Normalize();
                                 WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
-                                unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * 2f);
+                                unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * (significantEnemy.Depth/2.5f));
                                 unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.575f);
                                 //WorldPosition unitInFrontPosition = new WorldPosition(Mission.Current.Scene, unitInFront.GetWorldPosition().GetGroundVec3());
                                 //unitInFrontPosition.SetVec2(unitInFrontPosition.AsVec2 - formation.Direction *1.5f);
