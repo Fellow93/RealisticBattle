@@ -215,10 +215,12 @@ namespace RealisticBattle
                 }
                 if (____rightCavalry != null)
                 {
+                    ____rightCavalry.AI.SetBehaviorWeight<BehaviorProtectFlank>(3f);
                     ____rightCavalry.AI.SetBehaviorWeight<BehaviorMountedSkirmish>(1f);
                 }
                 if (____leftCavalry != null)
                 {
+                    ____leftCavalry.AI.SetBehaviorWeight<BehaviorProtectFlank>(3f);
                     ____leftCavalry.AI.SetBehaviorWeight<BehaviorMountedSkirmish>(1f);
                 }
             }
@@ -375,6 +377,7 @@ namespace RealisticBattle
             {
                 if(____cavalry != null)
                 {
+                    ____cavalry.AI.SetBehaviorWeight<BehaviorVanguard>(1.5f);
                     ____cavalry.AI.SetBehaviorWeight<BehaviorMountedSkirmish>(1f);
                 }
             }
@@ -558,7 +561,7 @@ namespace RealisticBattle
             [HarmonyPatch("HasBattleBeenJoined")]
             static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
             {
-                __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+                __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 14f);
             }
 
             [HarmonyPostfix]
@@ -618,7 +621,7 @@ namespace RealisticBattle
             [HarmonyPatch("HasBattleBeenJoined")]
             static void PostfixHasBattleBeenJoined(Formation ____mainInfantry, bool ____hasBattleBeenJoined, ref bool __result)
             {
-                __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 12f);
+                __result = Utilities.HasBattleBeenJoined(____mainInfantry, ____hasBattleBeenJoined, 14f);
             }
 
             [HarmonyPostfix]

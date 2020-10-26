@@ -908,17 +908,17 @@ namespace RealisticBattle
                         }
                     }
                 }
-                if (significantEnemy != null)
-                {
-                    if (___formation.Width > significantEnemy.Width)
-                    {
-                        significantEnemy.FormOrder = FormOrder.FormOrderCustom(___formation.Width);
-                    }
-                    else
-                    {
-                        ___formation.FormOrder = FormOrder.FormOrderCustom(significantEnemy.Width);
-                    }
-                }
+                //if (significantEnemy != null)
+                //{
+                //    if (___formation.Width > significantEnemy.Width)
+                //    {
+                //        significantEnemy.FormOrder = FormOrder.FormOrderCustom(___formation.Width);
+                //    }
+                //    else
+                //    {
+                //        ___formation.FormOrder = FormOrder.FormOrderCustom(significantEnemy.Width);
+                //    }
+                //}
             }
         }
     }
@@ -926,6 +926,8 @@ namespace RealisticBattle
     [HarmonyPatch(typeof(Formation))]
     class OverrideFormation
     {
+
+        static WorldPosition oldPosition;
         [HarmonyPrefix]
         [HarmonyPatch("GetOrderPositionOfUnit")]
         static bool PrefixGetOrderPositionOfUnit(Formation __instance, ref WorldPosition ____orderPosition, ref IFormationArrangement ____arrangement,  Agent unit, List<Agent> ___detachedUnits, ref WorldPosition __result)
@@ -955,6 +957,7 @@ namespace RealisticBattle
                             WorldPosition targetAgentPosition = new WorldPosition(Mission.Current.Scene, targetAgent.GetWorldPosition().GetGroundVec3());
 
                             int rank = ((IFormationUnit)unit).FormationRankIndex;
+                            int file = ((IFormationUnit)unit).FormationFileIndex;
                             if (rank >= 0)
                             {
                                 if (targetAgent.GetMorale() < 0.01f || targetAgent.IsRetreating() || targetAgent.IsRunningAway)
@@ -972,15 +975,34 @@ namespace RealisticBattle
                                 //Agent unitInFront = (lineFormation.GetNeighbourUnit(((IFormationUnit)unit), 0, -1) as Agent);
                                 //if (unitInFront != null)
                                 //{
-                                Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
-                                Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
-                                float distance = vec.Normalize();
-                                WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
-                                unitPosition.SetVec2(significantEnemy.QuerySystem.MedianPosition.AsVec2 - vec * (significantEnemy.Depth/2.5f));
-                                unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.575f);
+                                //if (Utilities.FormationFightingInMelee(formation))
+                                //{
+                                //    Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
+                                //    Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
+                                //    float distance = vec.Normalize();
+                                //    WorldPosition unitPosition = oldPosition;
+                                //    unitPosition.SetVec2(oldPosition.AsVec2 - vec * (significantEnemy.Depth / 2.75f));
+                                //    unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.575f);
+                                //    CurrentTargetPosition = unitPosition;
+                                //}
+                                //else
+                                //{
+                                    Vec2 v = formation.Direction.TransformToParentUnitF(localPosition.Value);
+                                    Vec2 vec = significantEnemy.QuerySystem.MedianPosition.AsVec2 - formation.QuerySystem.MedianPosition.AsVec2;
+                                    float distance = vec.Normalize();
+                                    WorldPosition unitPosition = significantEnemy.QuerySystem.MedianPosition;
+                                    oldPosition = new WorldPosition(Mission.Current.Scene, unitPosition.GetGroundVec3());
+                                    unitPosition.SetVec2(unitPosition.AsVec2 - vec * (significantEnemy.Depth / 2.5f));
+                                    unitPosition.SetVec2(unitPosition.AsVec2 + v * 0.575f);
+                                    CurrentTargetPosition = unitPosition;
+                                    FieldInfo field = typeof(LineFormation).GetField("_globalPositions", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    field.DeclaringType.GetField("_globalPositions");
+                                    MBList2D<WorldPosition> globalPositions = (MBList2D<WorldPosition>)field.GetValue(lineFormation);
+                                    globalPositions[file, rank] = unitPosition;
+                                //}
+
                                 //WorldPosition unitInFrontPosition = new WorldPosition(Mission.Current.Scene, unitInFront.GetWorldPosition().GetGroundVec3());
                                 //unitInFrontPosition.SetVec2(unitInFrontPosition.AsVec2 - formation.Direction *1.5f);
-                                CurrentTargetPosition = unitPosition;
                                 //}
                                 //else
                                 //{
@@ -1021,6 +1043,122 @@ namespace RealisticBattle
             }
             return true;
         }
+
+
+        [HarmonyPostfix]
+        [HarmonyPatch("AddUnit")]
+        static void PostfixAddUnit(Formation __instance, List<Agent> ___detachedUnits, List<Agent> ___looseDetachedUnits, Agent unit)
+        {
+            PropertyInfo property = typeof(Formation).GetProperty("arrangement", BindingFlags.NonPublic | BindingFlags.Instance);
+            property.DeclaringType.GetProperty("arrangement");
+            IFormationArrangement arrangement = (IFormationArrangement)property.GetValue(__instance);
+            //MethodInfo method = typeof(Formation).GetMethod("DetachUnit", BindingFlags.NonPublic | BindingFlags.Static);
+            //method.DeclaringType.GetMethod("DetachUnit");
+            //method.Invoke(__instance, new object[] { unit, false });
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch("GetMedianAgent")]
+        static bool PrefixGetMedianAgent(ref Agent __result, Formation __instance, List<Agent> ___detachedUnits, List<Agent> ___looseDetachedUnits, bool excludeDetachedUnits, bool excludePlayer, Vec2 averagePosition)
+        {
+            PropertyInfo property = typeof(Formation).GetProperty("arrangement", BindingFlags.NonPublic | BindingFlags.Instance);
+            property.DeclaringType.GetProperty("arrangement");
+            IFormationArrangement arrangement = (IFormationArrangement)property.GetValue(__instance);
+            LineFormation lineFormation = ((LineFormation)arrangement);
+            if (__instance.QuerySystem.IsInfantryFormation && Mission.Current.MissionTeamAIType == Mission.MissionTeamAITypeEnum.FieldBattle)
+            {
+                List<Agent> validAgents = new List<Agent>();
+                foreach (Agent unit in arrangement.GetAllUnits().ToList())
+                {
+                    int i = 0;
+                    float distanceSum = 0f;
+                    //foreach (Agent comparedUnit in arrangement.GetAllUnits().ToList())
+                    //{
+                    //    if (!excludePlayer || !unit.IsMainAgent)
+                    //    {
+                    //        distanceSum += unit.Position.AsVec2.Distance(comparedUnit.Position.AsVec2);
+                    //        i++;
+                    //    }
+                    //}
+                    if(lineFormation.GetWorldPositionOfUnitOrDefault(unit) != null)
+                    {
+                        if (unit.Position.AsVec2.Distance(lineFormation.GetWorldPositionOfUnitOrDefault(unit).Value.AsVec2) < 6f)
+                        {
+                            validAgents.Add(unit);
+                        }
+                    }
+                }
+
+                Vec2 newAveragePosition;
+
+                int count = validAgents.Count() ;
+                if (count > 0)
+                {
+                    Vec2 zero = Vec2.Zero;
+                    foreach (Agent allUnit in validAgents)
+                    {
+                        if (!excludePlayer || !allUnit.IsMainAgent)
+                        {
+                            zero += allUnit.Position.AsVec2;
+                        }
+                        else
+                        {
+                            count--;
+                        }
+                    }
+                    if (count > 0)
+                    {
+                        newAveragePosition = zero * (1f / (float)count);
+                    }
+                    else
+                    {
+                        newAveragePosition = Vec2.Invalid;
+                    }
+                }
+                else
+                {
+                    newAveragePosition = Vec2.Invalid;
+                }
+
+                __result = null;
+
+                float num = float.MaxValue;
+                foreach (Agent allUnit in validAgents)
+                {
+                    if (!excludePlayer || !allUnit.IsMainAgent)
+                    {
+                        float num2 = allUnit.Position.AsVec2.DistanceSquared(newAveragePosition);
+                        if (num2 <= num)
+                        {
+                            __result = allUnit;
+                            num = num2;
+                        }
+                    }
+                }
+                if (__result == null)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+                //LineFormation lineFormation = ((LineFormation)arrangement);
+                //if(lineFormation.GetAllUnits().ToList().Count() > 0)
+                //{
+                //    __result = lineFormation.GetAllUnits().ToList()[0] as Agent;
+                //    return false;
+                //}
+                //else
+                //{
+                //    return true;
+                //}
+            }
+            else
+            {
+                return true;
+            }
+        }
     }
 
     [HarmonyPatch(typeof(BehaviorRegroup))]
@@ -1031,7 +1169,7 @@ namespace RealisticBattle
 
         [HarmonyPrefix]
         [HarmonyPatch("GetAiWeight")]
-        static bool PostfixGetAiWeight(ref Formation ___formation, ref float __result)
+        static bool PrefixGetAiWeight(ref Formation ___formation, ref float __result)
         {
             if (___formation != null)
             {
@@ -1043,7 +1181,7 @@ namespace RealisticBattle
                 }
                 PropertyInfo property = typeof(BehaviorComponent).GetProperty("BehaviorCoherence", BindingFlags.NonPublic | BindingFlags.Instance);
                 property.DeclaringType.GetProperty("BehaviorCoherence");
-                float behaviorCoherence = (float)property.GetValue(___formation.AI.ActiveBehavior, BindingFlags.NonPublic | BindingFlags.GetProperty, null, null, null) * 4f;
+                float behaviorCoherence = (float)property.GetValue(___formation.AI.ActiveBehavior, BindingFlags.NonPublic | BindingFlags.GetProperty, null, null, null) * 2.75f;
 
                 //__result =  MBMath.Lerp(0.1f, 1.2f, MBMath.ClampFloat(behaviorCoherence * (querySystem.FormationIntegrityData.DeviationOfPositionsExcludeFarAgents + 1f) / (querySystem.IdealAverageDisplacement + 1f), 0f, 3f) / 3f);
                 __result = MBMath.Lerp(0.1f, 1.2f, MBMath.ClampFloat(behaviorCoherence * (querySystem.FormationIntegrityData.DeviationOfPositionsExcludeFarAgents + 1f) / (querySystem.IdealAverageDisplacement + 1f), 0f, 3f) / 3f);
@@ -1053,29 +1191,60 @@ namespace RealisticBattle
             return true;
         }
 
-        [HarmonyPrefix]
-        [HarmonyPatch("GetAiWeight")]
-        static bool PostfixGetAiWeight(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder, ref float __result)
-        {
-            if (___formation != null)
-            {
-                if (regroupPosition.IsValid)
-                {
-                    ____currentOrder = MovementOrder.MovementOrderMove(regroupPosition);
-                }
-                else
-                {
-                    WorldPosition medianPosition = ___formation.QuerySystem.MedianPosition;
-                    medianPosition.SetVec2(___formation.QuerySystem.AveragePosition + ___formation.Direction * 3f);
-                    ____currentOrder = MovementOrder.MovementOrderMove(medianPosition);
-                    regroupPosition = medianPosition;
-                }
-                Vec2 direction = (___formation.QuerySystem.ClosestEnemyFormation == null) ? ___formation.Direction : (___formation.QuerySystem.ClosestEnemyFormation.MedianPosition.AsVec2 - ___formation.QuerySystem.AveragePosition).Normalized();
-                MethodInfo method = typeof(FacingOrder).GetMethod("FacingOrderLookAtDirection", BindingFlags.NonPublic | BindingFlags.Static);
-                method.DeclaringType.GetMethod("FacingOrderLookAtDirection");
-                ___CurrentFacingOrder = (FacingOrder)method.Invoke(___CurrentFacingOrder, new object[] { direction });
-            }
-            return false;
-        }
+        //[HarmonyPrefix]
+        //[HarmonyPatch("CalculateCurrentOrder")]
+        //static bool PrefixCalculateCurrentOrder(ref Formation ___formation, ref MovementOrder ____currentOrder, ref FacingOrder ___CurrentFacingOrder)
+        //{
+        //    if (___formation != null)
+        //    {
+        //        if (regroupPosition.IsValid)
+        //        {
+        //            ____currentOrder = MovementOrder.MovementOrderMove(regroupPosition);
+        //        }
+        //        else
+        //        {
+        //            WorldPosition medianPosition = ___formation.QuerySystem.MedianPosition;
+        //            medianPosition.SetVec2(___formation.QuerySystem.AveragePosition + ___formation.Direction * 3f);
+        //            ____currentOrder = MovementOrder.MovementOrderMove(medianPosition);
+        //            regroupPosition = medianPosition;
+        //        }
+        //        Vec2 direction = (___formation.QuerySystem.ClosestEnemyFormation == null) ? ___formation.Direction : (___formation.QuerySystem.ClosestEnemyFormation.MedianPosition.AsVec2 - ___formation.QuerySystem.AveragePosition).Normalized();
+        //        MethodInfo method = typeof(FacingOrder).GetMethod("FacingOrderLookAtDirection", BindingFlags.NonPublic | BindingFlags.Static);
+        //        method.DeclaringType.GetMethod("FacingOrderLookAtDirection");
+        //        ___CurrentFacingOrder = (FacingOrder)method.Invoke(___CurrentFacingOrder, new object[] { direction });
+        //    }
+        //    return false;
+        //}
     }
+
+    //[HarmonyPatch(typeof(Mission))]
+    //class OverrideMission
+    //{
+    //    [HarmonyPostfix]
+    //    [HarmonyPatch("SpawnTroop")]
+    //    static void PostfixSpawnTroop(bool isReinforcement, ref Agent __result)
+    //    {
+    //        if (isReinforcement)
+    //        {
+    //            Formation foramtion = __result.Formation;
+    //            if(foramtion != null)
+    //            {
+    //                MethodInfo method = typeof(Formation).GetMethod("DetachUnit", BindingFlags.NonPublic | BindingFlags.Instance);
+    //                method.DeclaringType.GetMethod("DetachUnit");
+    //                method.Invoke(foramtion, new object[] { __result, false });
+    //            }
+    //        }
+    //    }
+
+    //    [HarmonyPostfix]
+    //    [HarmonyPatch("SpawnFormation")]
+    //    static void PostfixSpawnFormation(bool isReinforcement, Formation formation)
+    //    {
+    //        if (isReinforcement)
+    //        {
+                
+    //        }
+    //    }
+
+    //}
 }

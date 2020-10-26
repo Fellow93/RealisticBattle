@@ -100,11 +100,11 @@ namespace RealisticBattle
 
                     if (cslef.IsInfantryFormation || cslef.IsRangedFormation)
                     {
-                        return mainInfantry.QuerySystem.MedianPosition.AsVec2.Distance(cslef.MedianPosition.AsVec2) / cslef.MovementSpeedMaximum <= battleJoinRange + (hasBattleBeenJoined ? 5f : 0f);
+                        return mainInfantry.QuerySystem.MedianPosition.AsVec2.Distance(cslef.MedianPosition.AsVec2) / cslef.MovementSpeedMaximum <= battleJoinRange + (hasBattleBeenJoined ? 0f : 0f);
                     }
                     else
                     {
-                        return mainInfantry.QuerySystem.MedianPosition.AsVec2.Distance(cslef.MedianPosition.AsVec2) / (cslef.MovementSpeedMaximum * 0.6f) <= battleJoinRange + (hasBattleBeenJoined ? 5f : 0f);
+                        return mainInfantry.QuerySystem.MedianPosition.AsVec2.Distance(cslef.MedianPosition.AsVec2) / (cslef.MovementSpeedMaximum * 0.6f) <= battleJoinRange + (hasBattleBeenJoined ? 0f : 0f);
                     }
                 }
                 else
@@ -211,6 +211,47 @@ namespace RealisticBattle
                 }
             }
             return targetAgent;
+        }
+
+        public static bool FormationFightingInMelee(Formation formation)
+        {
+            bool fightingInMelee = false;
+            PropertyInfo property = typeof(Formation).GetProperty("arrangement", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property != null)
+            {
+                property.DeclaringType.GetProperty("arrangement");
+                IFormationArrangement arrangement = (IFormationArrangement)property.GetValue(formation);
+
+                FieldInfo field = typeof(LineFormation).GetField("_allUnits", BindingFlags.NonPublic | BindingFlags.Instance);
+                float currentTime = MBCommon.TimeType.Mission.GetTime();
+                float countOfUnitsInFirstRank = 0;
+                float countOfUnitsInFirstRankFighting = 0;
+                if (field != null)
+                {
+                    field.DeclaringType.GetField("_allUnits");
+                    List<IFormationUnit> agents = (List<IFormationUnit>)field.GetValue(arrangement);
+
+                    foreach (Agent agent in agents.ToList())
+                    {
+
+                        if(((IFormationUnit)agent).FormationRankIndex == 0)
+                        {
+                            countOfUnitsInFirstRank++;
+                            float lastMeleeAttackTime = agent.LastMeleeAttackTime;
+                            float lastMeleeHitTime = agent.LastMeleeHitTime;
+                            if ((currentTime - lastMeleeAttackTime < 4f) || (currentTime - lastMeleeHitTime < 4f))
+                            {
+                                countOfUnitsInFirstRankFighting++;
+                            }
+                        }
+                    }
+                    if(countOfUnitsInFirstRankFighting / countOfUnitsInFirstRank > 0.7f)
+                    {
+                        fightingInMelee = true;
+                    }
+                }
+            }
+            return fightingInMelee;
         }
     }
 
